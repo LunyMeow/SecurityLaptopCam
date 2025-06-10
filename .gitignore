@@ -4,3 +4,4 @@ WindowsVenv/
 WindowsVenv/*
 build
 build/*
+main.spec
