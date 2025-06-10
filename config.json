@@ -1,0 +1,5 @@
+{
+  "EMAIL_SENDER": "gmail@gmail.com",
+  "EMAIL_PASSWORD": "####",
+  "EMAIL_RECEIVERS": ["gmail@gmail.com"]
+}

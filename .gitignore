@@ -1,0 +1,6 @@
+venv/
+venv/*
+WindowsVenv/
+WindowsVenv/*
+build
+build/*
