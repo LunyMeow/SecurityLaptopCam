@@ -1,4 +1,3 @@
-Tabii! İşte hem İngilizce hem Türkçe açıklamalı, bu projeye uygun örnek bir **README.md** dosyası:
 
 ````markdown
 # Security Laptop Camera / Güvenlik Laptop Kamerası
