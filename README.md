@@ -1,4 +1,3 @@
-````markdown
 # 📷 Python Güvenlik Kamerası Sistemi (Hareket Algılama + Email Gönderme)
 
 Bu proje, OpenCV kullanarak hareket algılayan ve Flask ile canlı yayın sağlayan bir güvenlik kamerası uygulamasıdır. Hareket algılandığında belirlenen e-posta adreslerine anlık görüntü gönderir. Ayrıca canlı yayını tarayıcıdan izleyebilir ve bazı ayarları web arayüzünden değiştirebilirsiniz.
@@ -30,7 +29,6 @@ Aşağıdaki örneğe benzer bir `config.json` dosyası oluşturun:
     "alici2@example.com"
   ]
 }
-````
 
 ---
 
