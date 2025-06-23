@@ -30,7 +30,6 @@ Aşağıdaki örneğe benzer bir `config.json` dosyası oluşturun:
   ]
 }
 
----
 
 ## ▶️ Kullanım
 
