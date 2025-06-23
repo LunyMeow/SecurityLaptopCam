@@ -86,6 +86,5 @@ pyinstaller --onefile --add-data "config.json;." main.py
 ## 👤 Geliştirici
 
 Bedirhan Alparslan
-```
 
 
