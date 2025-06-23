@@ -1,122 +1,94 @@
-
 ````markdown
-# Security Laptop Camera / Güvenlik Laptop Kamerası
+# 📷 Python Güvenlik Kamerası Sistemi (Hareket Algılama + Email Gönderme)
+
+Bu proje, OpenCV kullanarak hareket algılayan ve Flask ile canlı yayın sağlayan bir güvenlik kamerası uygulamasıdır. Hareket algılandığında belirlenen e-posta adreslerine anlık görüntü gönderir. Ayrıca canlı yayını tarayıcıdan izleyebilir ve bazı ayarları web arayüzünden değiştirebilirsiniz.
 
 ---
 
-## English
+## 🔧 Özellikler
 
-This project is a simple security camera system with motion detection and live video streaming via a Flask web server.  
-When motion is detected, it sends an email with a snapshot. There is also a "freeze" feature activated by typing a secret word in the web interface.
+- ✅ Hareket algılama
+- ✅ E-posta ile uyarı gönderme
+- ✅ Flask ile canlı yayın
+- ✅ Email gönderimini web arayüzünden aç/kapat
+- ✅ Alıcı e-posta adreslerini web arayüzünden güncelleme
+- ✅ "hesoyam" komutuyla görüntüyü dondur / çöz
+- ✅ `.json` ile yapılandırılabilir ve dışarıdan dosya alır
 
-### Features
+---
 
-- Live camera streaming on a web page
-- Motion detection with bounding boxes
-- Email alerts with a captured image when motion occurs
-- Freeze/unfreeze live video by entering a secret code (`hesoyam`) on the webpage
+## ⚙️ Yapılandırma
 
-### Requirements
+Aşağıdaki örneğe benzer bir `config.json` dosyası oluşturun:
 
-- Python 3.x
-- OpenCV (`opencv-python`)
-- Flask
-- Email account (e.g., Gmail) with SMTP enabled
-- `config.json` file with email credentials and recipients
-
-### Setup
-
-1. Install dependencies:
-
-```bash
-pip install opencv-python flask
+```json
+{
+  "EMAIL_SENDER": "gonderen@gmail.com",
+  "EMAIL_PASSWORD": "uygulama-sifresi",
+  "EMAIL_RECEIVERS": [
+    "alici1@example.com",
+    "alici2@example.com"
+  ]
+}
 ````
 
-2. Create a `config.json` file in the project directory with the following structure:
-
-```json
-{
-  "EMAIL_SENDER": "your_email@gmail.com",
-  "EMAIL_PASSWORD": "your_email_password_or_app_password",
-  "EMAIL_RECEIVERS": ["receiver1@example.com", "receiver2@example.com"]
-}
-```
-
-3. Run the script:
-
-```bash
-python main.py
-```
-
-4. Open your browser and go to:
-
-```
-http://localhost:8000/
-```
-
-### Usage
-
-* Click **"Canlı Yayını İzle"** on the main page to watch the live video feed.
-* In the live feed page, type **hesoyam** in the input box to freeze/unfreeze the video.
-* When motion is detected, an email with an image attachment will be sent to the configured recipients (every 10 seconds at most).
-
 ---
 
-## Türkçe
+## ▶️ Kullanım
 
-Bu proje, hareket algılama ve canlı video yayını yapan basit bir güvenlik kamerası sistemidir.
-Hareket algılandığında, anlık görüntü e-posta ile gönderilir. Ayrıca, web arayüzündeki gizli kelime girildiğinde videoyu dondurma/çözme özelliği vardır.
-
-### Özellikler
-
-* Web sayfasında canlı kamera yayını
-* Hareket algılama ve hareket alanına kutu çizme
-* Hareket olduğunda e-posta bildirimi ve ekli görüntü gönderimi
-* Web sayfasındaki gizli kelime (`hesoyam`) ile videoyu dondurma ve çözme
-
-### Gereksinimler
-
-* Python 3.x
-* OpenCV (`opencv-python`)
-* Flask
-* SMTP etkinleştirilmiş bir e-posta hesabı (örneğin Gmail)
-* E-posta bilgileri ve alıcıların yazıldığı `config.json` dosyası
-
-### Kurulum
-
-1. Gerekli paketleri yükleyin:
+### 1. Gerekli paketleri yükle
 
 ```bash
 pip install opencv-python flask
 ```
 
-2. Proje klasörüne aşağıdaki gibi bir `config.json` dosyası oluşturun:
-
-```json
-{
-  "EMAIL_SENDER": "sizin_email@gmail.com",
-  "EMAIL_PASSWORD": "email_sifreniz_veya_uygulama_sifresi",
-  "EMAIL_RECEIVERS": ["alici1@example.com", "alici2@example.com"]
-}
-```
-
-3. Scripti çalıştırın:
+### 2. Uygulamayı çalıştır
 
 ```bash
-python main.py
+python main.py                 # config.json kullanır
+python main.py ayarlar.json   # başka bir config dosyası kullan
 ```
 
-4. Tarayıcınızda şu adresi açın:
+### 3. Tarayıcıdan yayını izleyin
 
-```
-http://localhost:8000/
-```
-
-### Kullanım
-
-* Ana sayfadaki **"Canlı Yayını İzle"** butonuna tıklayarak canlı görüntüyü izleyin.
-* Canlı yayın sayfasındaki metin kutusuna **hesoyam** yazıp enter tuşuna basmadan bekleyin; video dondurulur veya çözülür.
-* Hareket algılandığında, 10 saniyede bir en fazla olacak şekilde, ayarlanan alıcılara e-posta ile anlık görüntü gönderilir.
+[http://localhost:8000](http://localhost:8000)
 
 ---
+
+## 🖥️ Arayüz Özellikleri
+
+* **Canlı Yayın:** Kameradan gelen görüntü anlık olarak gösterilir.
+* **Email Gönderilsin mi?:** Checkbox ile mail gönderme aktif/pasif yapılabilir.
+* **Alıcı Email Adresleri:** Güncellenebilir textarea. Satır satır adres girin.
+* **Gönderilen Emailler:** Kime mail gönderildiği listelenir.
+* **"hesoyam" komutu:** Yazınca görüntü dondurulur/çözülür.
+
+---
+
+## 📦 EXE'ye Dönüştürme (PyInstaller)
+
+```bash
+pyinstaller --onefile --add-data "config.json;." main.py
+```
+
+* `config.json` dosyasını exe'ye dahil eder.
+* Exe çalışırken bu dosya yanında olmalıdır.
+
+---
+
+## 📝 Notlar
+
+* Gmail ile kullanıyorsan, "uygulama şifresi" oluşturmalısın. (2 Adımlı doğrulama açık olmalı.)
+* `motion.jpg` her tespit edilen harekette yeniden yazılır.
+
+---
+
+
+---
+
+## 👤 Geliştirici
+
+Bedirhan Alparslan
+```
+
 

@@ -1,7 +1,19 @@
+# Virtual Environments
 venv/
-venv/*
 WindowsVenv/
-WindowsVenv/*
-build
-build/*
-main.spec
+
+# PyInstaller Build Output
+build/
+dist/
+*.spec
+
+# Runtime Files
+configMain.json
+motion.jpg
+
+# __pycache__ and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log

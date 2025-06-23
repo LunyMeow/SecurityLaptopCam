@@ -3,15 +3,33 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 import time
-from flask import Flask, Response, render_template_string
+from flask import Flask, Response, render_template_string, request, redirect, url_for
 import threading
 import json
-import os
+import sys
+
+email_enabled = True
+sent_emails_log = []
 
 
+jsonFile = "config.json"
+default_config_file = "config.json"
+jsonFile = sys.argv[1] if len(sys.argv) > 1 else default_config_file
+print(f"🛠️  Kullanılan config dosyası: {jsonFile}")
+config=None
 # config.json dosyasını oku
-with open("config.json", "r") as config_file:
-    config = json.load(config_file)
+def openConfig():
+    global config
+    with open(jsonFile, "r") as config_file:
+        config = json.load(config_file)
+openConfig()
+
+# bu kod bloğuna eklenmeli (HTML'den önce)
+def save_config():
+    with open(jsonFile, "w") as f:
+        config["EMAIL_RECEIVERS"] = EMAIL_RECEIVERS
+        json.dump(config, f, indent=4)
+    openConfig()
 
 EMAIL_SENDER = config.get("EMAIL_SENDER")
 EMAIL_PASSWORD = config.get("EMAIL_PASSWORD")
@@ -51,53 +69,80 @@ HTML_VIDEO = """
 <head>
     <title>Canlı Yayın</title>
     <style>
-        body {
-            text-align: center;
-            font-family: Arial;
-            background: #111;
-            color: white;
-        }
-        img {
-            margin-top: 20px;
-            border: 5px solid #555;
-        }
-        input {
-            margin-top: 20px;
-            padding: 10px;
-            font-size: 16px;
-            border-radius: 5px;
-            border: none;
-            width: 200px;
-        }
+        body { text-align: center; font-family: Arial; background: #111; color: white; }
+        img { margin-top: 20px; border: 5px solid #555; }
+        input, textarea, button { margin-top: 15px; font-size: 16px; border-radius: 5px; padding: 10px; border: none; }
+        textarea { width: 300px; height: 100px; resize: vertical; }
+        .section { margin-top: 30px; }
+        label { display: block; margin-top: 10px; }
     </style>
 </head>
 <body>
     <h1>🎥 Canlı Yayın</h1>
-    
-    <input type="text" id="secretInput" placeholder="">
 
-    <img src="{{ url_for('video_feed') }}" width="640" height="480" id="video">
+    <div class="section">
+        <input type="text" id="secretInput" placeholder="Komut gir...">
+    </div>
+
+    <div class="section">
+        <label>
+            <input type="checkbox" id="emailToggle" {% if email_enabled %}checked{% endif %} onchange="toggleEmail()"> Email Gönderilsin mi?
+        </label>
+    </div>
+
+    <div class="section">
+        <form method="POST" action="/update_emails">
+            <label>Alıcı Email Adresleri:</label>
+            <textarea name="emails">{{ receivers }}</textarea><br>
+            <button type="submit">Alıcıları Güncelle</button>
+        </form>
+    </div>
+
+    <div class="section">
+        <h3>Gönderilen Emailler:</h3>
+        <ul id="sentList">
+            {% for mail in sent_log %}
+                <li>{{ mail }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="section">
+        <img src="{{ url_for('video_feed') }}" width="640" height="480" id="video">
+    </div>
 
     <script>
         const inputBox = document.getElementById('secretInput');
+        const emailToggle = document.getElementById('emailToggle');
 
         inputBox.addEventListener('input', function() {
             if (inputBox.value.toLowerCase().trim() === 'hesoyam') {
-                fetch('/toggle_freeze');  // Sunucuya komut gönder
-                inputBox.value = '';      // Girdiyi temizle
+                fetch('/toggle_freeze');
+                inputBox.value = '';
             }
         });
+
+        function toggleEmail() {
+            fetch('/toggle_email?enabled=' + (emailToggle.checked ? '1' : '0'));
+        }
     </script>
 </body>
 </html>
-
 """
 
+
+
+
 def send_email(image_path):
+    print(EMAIL_RECEIVERS)
     if freeze_frame:
         print("Görüntü donduruldu. Mail gönderilmiyor.")
         return
-      # mail istemiyorsan bu satır kalsın
+
+    if not email_enabled:
+        print("📭 Mail gönderimi pasif! Gönderilmedi.")
+        return
+
     try:
         msg = EmailMessage()
         msg['Subject'] = 'Hareket Algılandı!'
@@ -114,8 +159,10 @@ def send_email(image_path):
             smtp.login(EMAIL_SENDER, EMAIL_PASSWORD)
             smtp.send_message(msg)
         print("📧 Mail gönderildi.")
+        sent_emails_log.append(', '.join(EMAIL_RECEIVERS))
     except Exception as e:
         print(f"Mail gönderilirken hata oluştu: {e}")
+
 
 def motion_detection():
     global last_sent_time, latest_frame, freeze_frame, frozen_image,email_thread
@@ -180,11 +227,32 @@ def index():
 
 @app.route('/video')
 def video_page():
-    return render_template_string(HTML_VIDEO)
+    return render_template_string(
+        HTML_VIDEO,
+        receivers="\n".join(EMAIL_RECEIVERS),
+        email_enabled=email_enabled,
+        sent_log=EMAIL_RECEIVERS
+    )
+
 
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/toggle_email')
+def toggle_email():
+    global email_enabled
+    email_enabled = request.args.get("enabled") == "1"
+    print(f"📩 Email gönderimi: {'AÇIK' if email_enabled else 'KAPALI'}")
+    return ('', 204)
+
+@app.route('/update_emails', methods=['POST'])
+def update_emails():
+    global EMAIL_RECEIVERS
+    emails_raw = request.form.get("emails", "")
+    EMAIL_RECEIVERS = [line.strip() for line in emails_raw.splitlines() if line.strip()]
+    save_config()
+    return redirect(url_for('video_page'))
 
 @app.route('/toggle_freeze')
 def toggle_freeze():
