@@ -29,7 +29,7 @@ Aşağıdaki örneğe benzer bir `config.json` dosyası oluşturun:
     "alici2@example.com"
   ]
 }
-
+```
 
 ## ▶️ Kullanım
 
