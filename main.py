@@ -1,14 +1,22 @@
+from datetime import datetime
 import cv2
 import smtplib
 import ssl
 from email.message import EmailMessage
 import time
-from flask import Flask, Response, render_template_string, request, redirect, url_for
+from flask import Flask, Response, render_template_string, request, redirect, url_for,send_from_directory
 import threading
 import json
-import sys
+import sys,os
 
-email_enabled = True
+import atexit
+
+
+
+
+
+
+email_enabled = False
 sent_emails_log = []
 
 
@@ -35,6 +43,11 @@ EMAIL_SENDER = config.get("EMAIL_SENDER")
 EMAIL_PASSWORD = config.get("EMAIL_PASSWORD")
 EMAIL_RECEIVERS = config.get("EMAIL_RECEIVERS", [])
 
+# Video klasörü varsa atla, yoksa oluştur
+if not os.path.exists("videos"):
+    os.makedirs("videos")
+
+
 
 cap = cv2.VideoCapture(0)
 time.sleep(2)
@@ -45,6 +58,15 @@ latest_frame = None
 freeze_frame = False  # dondurma durumu
 frozen_image = None
 email_thread = None  # en başta tanımlanmalı
+
+recording = False
+video_writer = None
+no_motion_timer = None
+
+VIDEO_TIMEOUT = 1*60  # 5 dakika saniye cinsinden
+
+
+
 
 HTML_MAIN = """
 <!DOCTYPE html>
@@ -59,6 +81,24 @@ HTML_MAIN = """
 <body>
     <h1>📷 Güvenlik Kamerasına Hoş Geldiniz!</h1>
     <button onclick="window.location.href='/video'">Canlı Yayını İzle</button>
+    <button onclick="window.location.href='/videos'">Kayıtlara bak</button>
+</body>
+</html>
+"""
+
+
+HTML_VIDEO_LIST = """
+<!DOCTYPE html>
+<html>
+<head><title>Videolar</title></head>
+<body>
+    <h1>Kayıtlar</h1>
+    <ul>
+        {% for video in videos %}
+            <li><a href="/videos/{{ video }}">{{ video }}</a></li>
+        {% endfor %}
+    </ul>
+    <a href="/">Geri</a>
 </body>
 </html>
 """
@@ -79,7 +119,7 @@ HTML_VIDEO = """
 </head>
 <body>
     <h1>🎥 Canlı Yayın</h1>
-
+{%if recording%}🔴 Recording{%endif%}
     <div class="section">
         <input type="text" id="secretInput" placeholder="Komut gir...">
     </div>
@@ -164,8 +204,30 @@ def send_email(image_path):
         print(f"Mail gönderilirken hata oluştu: {e}")
 
 
+
+
+
+def stop_recording():
+    global recording, video_writer, no_motion_timer
+    if video_writer:
+        video_writer.release()
+        print("📍 Video kaydı durduruldu.")
+    recording = False
+    no_motion_timer = None
+
+def start_recording():
+    global recording, video_writer
+    if not recording:
+        filename = datetime.now().strftime("videos/%Y-%m-%d_%H-%M-%S.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # veya 'avc1' (bazı sistemlerde daha uyumlu)
+
+        video_writer = cv2.VideoWriter(filename, fourcc, 20.0, (640, 480))
+        recording = True
+        print(f"📍 Video kaydı başladı: {filename}")
+
+
 def motion_detection():
-    global last_sent_time, latest_frame, freeze_frame, frozen_image,email_thread
+    global last_sent_time, latest_frame, freeze_frame, frozen_image,email_thread,video_writer,no_motion_timer
     frame1 = cap.read()[1]
     frame2 = cap.read()[1]
 
@@ -191,6 +253,11 @@ def motion_detection():
             cv2.rectangle(frame1, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
         if motion_detected:
+
+            
+
+
+
             current_time = time.time()
             if current_time - last_sent_time >= 10:
                 if email_thread is None or not email_thread.is_alive():
@@ -199,6 +266,16 @@ def motion_detection():
                     email_thread = threading.Thread(target=send_email, args=('motion.jpg',), daemon=True)
                     email_thread.start()
                     last_sent_time = current_time
+        
+        if motion_detected and not freeze_frame:
+            start_recording()
+            no_motion_timer = time.time() + VIDEO_TIMEOUT
+
+
+        if recording:
+            video_writer.write(frame)
+            if no_motion_timer and time.time() > no_motion_timer:
+                stop_recording()
 
         if not freeze_frame:
             latest_frame = frame1.copy()
@@ -231,8 +308,21 @@ def video_page():
         HTML_VIDEO,
         receivers="\n".join(EMAIL_RECEIVERS),
         email_enabled=email_enabled,
-        sent_log=EMAIL_RECEIVERS
+        sent_log=EMAIL_RECEIVERS,
+        recording=recording
     )
+
+
+@app.route('/videos')
+def video_list():
+    files = sorted(os.listdir("videos"), reverse=True)
+    return render_template_string(HTML_VIDEO_LIST, videos=files)
+
+@app.route('/videos/<filename>')
+def serve_video(filename):
+    return send_from_directory("videos", filename)
+
+
 
 
 @app.route('/video_feed')
@@ -262,6 +352,15 @@ def toggle_freeze():
         frozen_image = None
     print(f"🎮 Freeze modu: {'DONDURULDU' if freeze_frame else 'CANLI'}")
     return ('', 204)  # boş yanıt
+
+
+def safe_cleanup():
+    global recording, video_writer
+    if recording and video_writer:
+        video_writer.release()
+        print("🔚 Program kapanırken kayıt durduruldu.")
+
+atexit.register(safe_cleanup)
 
 if __name__ == "__main__":
     threading.Thread(target=motion_detection, daemon=True).start()
