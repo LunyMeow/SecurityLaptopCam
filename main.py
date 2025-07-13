@@ -5,6 +5,8 @@ import ssl
 from email.message import EmailMessage
 import time
 from flask import Flask, Response, render_template_string, request, redirect, url_for,send_from_directory
+from flask import session
+
 import threading
 import json
 import sys,os
@@ -32,6 +34,8 @@ def openConfig():
         config = json.load(config_file)
 openConfig()
 
+
+
 # bu kod bloğuna eklenmeli (HTML'den önce)
 def save_config():
     with open(jsonFile, "w") as f:
@@ -53,6 +57,11 @@ cap = cv2.VideoCapture(0)
 time.sleep(2)
 
 app = Flask(__name__)
+
+app.secret_key = config['SECRET_KEY']  # Rastgele güçlü bir şey koy
+
+
+
 last_sent_time = 0
 latest_frame = None
 freeze_frame = False  # dondurma durumu
@@ -169,6 +178,43 @@ HTML_VIDEO = """
 </body>
 </html>
 """
+
+
+
+
+
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user = request.form.get('username')
+        pw = request.form.get('password')
+        if user == config.get("LOGIN_USER") and pw == config.get("LOGIN_PASS"):
+            session['logged_in'] = True
+            return redirect(url_for('index'))
+        return "❌ Hatalı giriş!"
+    return '''
+        <form method="POST">
+            Kullanıcı: <input type="text" name="username"><br>
+            Şifre: <input type="password" name="password"><br>
+            <input type="submit" value="Giriş Yap">
+        </form>
+    '''
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
+
+
+@app.before_request
+def require_login():
+    open_paths = ['/login', '/static']  # login hariç yollar
+    if not session.get('logged_in') and not request.path.startswith(tuple(open_paths)):
+        return redirect(url_for('login'))
+
 
 
 

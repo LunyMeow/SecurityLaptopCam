@@ -1,5 +1,10 @@
 {
-  "EMAIL_SENDER": "gmail@gmail.com",
-  "EMAIL_PASSWORD": "####",
-  "EMAIL_RECEIVERS": ["gmail@gmail.com"]
+    "EMAIL_SENDER": "example@gmail.com",
+    "EMAIL_PASSWORD": "#### ####",
+    "EMAIL_RECEIVERS": [
+        "example@gmail.com"
+    ],
+    "LOGIN_USER": "admin",
+    "LOGIN_PASS": "admin",
+    "SECRET_KEY":"secret"
 }
