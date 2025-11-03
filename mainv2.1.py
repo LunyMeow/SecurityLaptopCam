@@ -1,3 +1,4 @@
+#this version is for termux and pc dynamic running
 from datetime import datetime
 import cv2
 import smtplib
@@ -13,6 +14,8 @@ import sys,os
 
 import atexit
 
+import platform
+
 
 
 
@@ -25,6 +28,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Güvenlik Kamera Sunucusu")
 parser.add_argument('--config', '-c', type=str, default='config.json', help='Config dosyası yolu')
+parser.add_argument('--camIP','-ip',type=str,default="None",help="For the webcam ip address")
 args = parser.parse_args()
 
 jsonFile = args.config
@@ -52,12 +56,26 @@ EMAIL_PASSWORD = config.get("EMAIL_PASSWORD")
 EMAIL_RECEIVERS = config.get("EMAIL_RECEIVERS", [])
 
 # Video klasörü varsa atla, yoksa oluştur
-if not os.path.exists("videos"):
-    os.makedirs("videos")
+# ------------------ PATHS ------------------
+base_dir = "videos"
+if platform.system() == "Linux" and "android" in platform.platform().lower():
+    # Termux Android
+    base_dir = "/data/data/com.termux/files/home/videos"
+if not os.path.exists(base_dir):
+    os.makedirs(base_dir)
 
 
+print("Sistem:",platform.platform(),platform.system())
+# ------------------ CAMERA ------------------
+if platform.system() == "Linux" and "android" in platform.platform().lower():
+    # Termux Android kamera, OpenCV çalışmayabilir. Burada test için USB kamera veya IP kamera kullanılabilir
+    print("Detected android using ip address for webcam")
+    cap = cv2.VideoCapture(args.camIp)
+else:
+    # PC Windows/Linux
+    cap = cv2.VideoCapture(0)
 
-cap = cv2.VideoCapture(0)
+
 time.sleep(2)
 
 app = Flask(__name__)
@@ -65,18 +83,16 @@ app = Flask(__name__)
 app.secret_key = config['SECRET_KEY']  # Rastgele güçlü bir şey koy
 
 
-
+# ------------------ GLOBALS ------------------
 last_sent_time = 0
 latest_frame = None
-freeze_frame = False  # dondurma durumu
+freeze_frame = False
 frozen_image = None
-email_thread = None  # en başta tanımlanmalı
-
+email_thread = None
 recording = False
 video_writer = None
 no_motion_timer = None
-
-VIDEO_TIMEOUT = 1*60  # 5 dakika saniye cinsinden
+VIDEO_TIMEOUT = 1*60  # saniye
 
 
 
@@ -223,16 +239,14 @@ def require_login():
 
 
 
+# ------------------ EMAIL ------------------
 def send_email(image_path):
-    print(EMAIL_RECEIVERS)
     if freeze_frame:
         print("Görüntü donduruldu. Mail gönderilmiyor.")
         return
-
     if not email_enabled:
         print("📭 Mail gönderimi pasif! Gönderilmedi.")
         return
-
     try:
         msg = EmailMessage()
         msg['Subject'] = 'Hareket Algılandı!'
@@ -265,25 +279,32 @@ def stop_recording():
     recording = False
     no_motion_timer = None
 
+
+# ------------------ RECORDING FUNCTIONS ------------------
 def start_recording():
     global recording, video_writer
     if not recording:
-        filename = datetime.now().strftime("videos/%Y-%m-%d_%H-%M-%S.mp4")
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # veya 'avc1' (bazı sistemlerde daha uyumlu)
-
+        if platform.system() == "Linux" and "android" in platform.platform().lower():
+            filename = os.path.join(base_dir, datetime.now().strftime("%Y-%m-%d_%H-%M-%S.avi"))
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        else:
+            filename = os.path.join(base_dir, datetime.now().strftime("%Y-%m-%d_%H-%M-%S.mp4"))
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         video_writer = cv2.VideoWriter(filename, fourcc, 20.0, (640, 480))
         recording = True
         print(f"📍 Video kaydı başladı: {filename}")
 
 
+# ------------------ MOTION DETECTION ------------------
 def motion_detection():
-    global last_sent_time, latest_frame, freeze_frame, frozen_image,email_thread,video_writer,no_motion_timer
+    global last_sent_time, latest_frame, freeze_frame, frozen_image, email_thread, video_writer, no_motion_timer
     frame1 = cap.read()[1]
     frame2 = cap.read()[1]
 
     while True:
         success, frame = cap.read()
         if not success:
+            time.sleep(0.01)
             continue
 
         diff = cv2.absdiff(frame1, frame2)
@@ -303,24 +324,18 @@ def motion_detection():
             cv2.rectangle(frame1, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
         if motion_detected:
-
-            
-
-
-
             current_time = time.time()
             if current_time - last_sent_time >= 10:
                 if email_thread is None or not email_thread.is_alive():
-                    cv2.imwrite('motion.jpg', frame1)
+                    cv2.imwrite(os.path.join(base_dir, 'motion.jpg'), frame1)
                     print("🎯 Hareket algılandı! Mail gönderiliyor...")
-                    email_thread = threading.Thread(target=send_email, args=('motion.jpg',), daemon=True)
+                    email_thread = threading.Thread(target=send_email, args=(os.path.join(base_dir,'motion.jpg'),), daemon=True)
                     email_thread.start()
                     last_sent_time = current_time
-        
+
         if motion_detected and not freeze_frame:
             start_recording()
             no_motion_timer = time.time() + VIDEO_TIMEOUT
-
 
         if recording:
             video_writer.write(frame)
@@ -336,6 +351,9 @@ def motion_detection():
 
         frame1 = frame2
         frame2 = frame
+        if platform.system() == "Linux" and "android" in platform.platform().lower():
+
+            time.sleep(0.01)  # CPU dostu
 
 def generate_frames():
     global latest_frame
@@ -404,6 +422,7 @@ def toggle_freeze():
     return ('', 204)  # boş yanıt
 
 
+# ------------------ CLEANUP ------------------
 def safe_cleanup():
     global recording, video_writer
     if recording and video_writer:
@@ -412,6 +431,11 @@ def safe_cleanup():
 
 atexit.register(safe_cleanup)
 
+# ------------------ FLASK RUN ------------------
 if __name__ == "__main__":
     threading.Thread(target=motion_detection, daemon=True).start()
-    app.run(host='0.0.0.0', port=8000)
+    # Termux port ve host kontrolü
+    if platform.system() == "Linux" and "android" in platform.platform().lower():
+        app.run(host='0.0.0.0', port=5000)
+    else:
+        app.run(host='0.0.0.0', port=8000)
